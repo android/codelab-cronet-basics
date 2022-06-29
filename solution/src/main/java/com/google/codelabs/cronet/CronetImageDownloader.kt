@@ -18,11 +18,11 @@ internal class CronetImageDownloader (
 
     private val executor = Executors.newSingleThreadExecutor()
 
-    override suspend fun downloadImage(url: String): ImageDownloaderResult {
+    override suspend fun downloadImage(urlString: String): ImageDownloaderResult {
         val startNanoTime = System.nanoTime()
         return suspendCoroutine {
             cont ->
-            val request = engine.newUrlRequestBuilder(url, object: ReadToMemoryCronetCallback() {
+            val request = engine.newUrlRequestBuilder(urlString, object: ReadToMemoryCronetCallback() {
             override fun onSucceeded(
                 request: UrlRequest,
                 info: UrlResponseInfo,
@@ -50,11 +50,11 @@ internal class CronetImageDownloader (
             }
         }, executor)
 
-            if (url == CronetCodelabConstants.URLS[0]) {
-                request.disableCache()
-            }
+        if (urlString == CronetCodelabConstants.URLS[0]) {
+            request.disableCache()
+        }
 
-            request.build().start()
+        request.build().start()
         }
     }
 

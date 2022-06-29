@@ -13,4 +13,6 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "CronetCodelab"
-include ':app'
+include ':base'
+include ':solution'
+

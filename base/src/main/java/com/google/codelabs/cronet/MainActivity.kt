@@ -2,7 +2,6 @@ package com.google.codelabs.cronet
 
 import android.graphics.BitmapFactory
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -15,22 +14,21 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
 import com.google.codelabs.cronet.ui.theme.CronetCodelabTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 import androidx.compose.ui.unit.dp
-import com.google.codelabs.cronet.CronetCodelabConstants.LOGGER_TAG
-import com.google.android.gms.net.CronetProviderInstaller
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.chromium.net.CronetEngine
-import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 import java.util.function.Supplier
 
 class MainActivity : ComponentActivity() {
+    private var imageDownloader: AtomicReference<ImageDownloader> = AtomicReference(NativeImageDownloader())
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // TODO(you): initialize Cronet provider
         setContent {
             CronetCodelabTheme {
                 // A surface container using the 'background' color from the theme
@@ -38,7 +36,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                    MainDisplay()
+                    MainDisplay(imageDownloader::get)
                 }
             }
         }
@@ -47,23 +45,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainDisplay(
+    imageDownloader: Supplier<ImageDownloader>,
     imagesViewModel: ImagesViewModel = viewModel()
 ) {
-    var imageDownloader: ImageDownloader = NativeImageDownloader()
-
-    val ctx = LocalContext.current
-    CronetProviderInstaller.installProvider(ctx).addOnCompleteListener {
-        if (it.isSuccessful) {
-            Log.i(LOGGER_TAG, "Successfully installed Play Services provider: $it")
-            val cronetEngine = CronetEngine.Builder(ctx)
-                .enableHttpCache(CronetEngine.Builder.HTTP_CACHE_IN_MEMORY, 10 * 1024 * 1024)
-                .build()
-            imageDownloader = CronetImageDownloader(cronetEngine)
-        } else {
-            Log.w(LOGGER_TAG, "Unable to load Cronet from Play Services", it.exception)
-        }
-    }
-
     Scaffold(
         floatingActionButton = {
             ListButton(onClick = {
@@ -71,15 +55,11 @@ fun MainDisplay(
             })
         }
     ) {
-        Column {
-            Row {
-                ImageList(
-                    list = imagesViewModel.images,
-                    { imageDownloader }
-                ) { i: Int, downloaded: ImageDownloaderResult ->
-                    imagesViewModel.setDownloaded(i, downloaded)
-                }
-            }
+        ImageList(
+            list = imagesViewModel.images,
+            imageDownloader
+        ) { i: Int, downloaded: ImageDownloaderResult ->
+            imagesViewModel.setDownloaded(i, downloaded)
         }
     }
 }
@@ -144,7 +124,7 @@ fun ImageListItem(image: DownloadedImage, triggerImageDownload: suspend () -> Un
 }
 
 @Composable
-fun PendingDownloadImageListItem(url: String) {
+fun RowScope.PendingDownloadImageListItem(url: String) {
     Column {
         CircularProgressIndicator()
     }
@@ -154,7 +134,7 @@ fun PendingDownloadImageListItem(url: String) {
 }
 
 @Composable
-fun DownloadedImageListItem(download: ImageDownloaderResult) {
+fun RowScope.DownloadedImageListItem(download: ImageDownloaderResult) {
     Column {
         Image(
             BitmapFactory.decodeByteArray(
